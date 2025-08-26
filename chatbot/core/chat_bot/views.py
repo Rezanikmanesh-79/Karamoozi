@@ -1,15 +1,20 @@
 from decouple import config
-import requests
 from django.views.generic import TemplateView
 from django.shortcuts import render
+from langchain_openai import ChatOpenAI
+import tiktoken
+
 
 API_KEY = config("API_KEY")
-API_URL = config("API_URL")
+API_URL = config("API_URL")  
 
-HEADERS = {
-    "Content-Type": "application/json",
-    "Authorization": f"Bearer {API_KEY}"
-}
+MODEL_NAME = "gpt-4o-mini"
+
+llm = ChatOpenAI(
+    model=MODEL_NAME,
+    base_url=API_URL,
+    api_key=API_KEY,
+)
 
 
 class ChatView(TemplateView):
@@ -30,20 +35,41 @@ class ChatView(TemplateView):
             "user_input": user_input
         })
 
-def chat_with_bot(user_message):
-    data = {
-        "model": "gpt-4.1",
-        "messages": [
-            {"role": "user", "content": user_message}
-        ]
-    }
 
-    response = requests.post(API_URL, headers=HEADERS, json=data)
+def num_tokens_from_messages(messages, model="gpt-4o-mini"):
 
-    if response.status_code == 200:
-        response_json = response.json()
-        assistant_reply = response_json["choices"][0]["message"]["content"]
-        usage_info = response_json.get("usage", {})
+    try:
+        encoding = tiktoken.encoding_for_model(model)
+    except KeyError:
+        encoding = tiktoken.get_encoding("cl100k_base")
+
+    tokens = 0
+    for msg in messages:
+        tokens += len(encoding.encode(msg["content"]))
+    return tokens
+
+
+def chat_with_bot(user_message: str):
+    messages = [
+        {"role": "system", "content": "You are a helpful assistant who answers in Persian."},
+        {"role": "user", "content": user_message},
+    ]
+
+    try:
+        response = llm.invoke(messages)
+        assistant_reply = response.content
+
+        prompt_tokens = num_tokens_from_messages(messages, MODEL_NAME)
+        completion_tokens = len(tiktoken.encoding_for_model(MODEL_NAME).encode(assistant_reply))
+        total_tokens = prompt_tokens + completion_tokens
+
+        usage_info = {
+            "prompt_tokens": prompt_tokens,
+            "completion_tokens": completion_tokens,
+            "total_tokens": total_tokens
+        }
+
         return assistant_reply, usage_info
-    else:
-        return None, {"error": response.text}
+
+    except Exception as e:
+        return None, {"error": str(e)}
