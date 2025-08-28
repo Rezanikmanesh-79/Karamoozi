@@ -7,8 +7,8 @@ import tiktoken
 
 API_KEY = config("API_KEY")
 API_URL = config("API_URL")  
-
 MODEL_NAME = "gpt-4o-mini"
+TARGET_WEB="digikala.com"
 
 llm = ChatOpenAI(
     model=MODEL_NAME,
@@ -51,7 +51,7 @@ def num_tokens_from_messages(messages, model="gpt-4o-mini"):
 
 def chat_with_bot(user_message: str):
     messages = [
-        {"role": "system", "content": "You are a helpful assistant who answers in Persian."},
+        {"role": "system", "content": F"You are the support assistant of {TARGET_WEB}. Only answer questions about login, payment, and courses in Persian."},
         {"role": "user", "content": user_message},
     ]
 
