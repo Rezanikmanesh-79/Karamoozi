@@ -8,7 +8,7 @@ import tiktoken
 API_KEY = config("API_KEY")
 API_URL = config("API_URL")  
 MODEL_NAME = "gpt-4o-mini"
-TARGET_WEB="digikala.com"
+TARGET_WEB="ehadish.com"
 
 llm = ChatOpenAI(
     model=MODEL_NAME,
@@ -51,9 +51,17 @@ def num_tokens_from_messages(messages, model="gpt-4o-mini"):
 
 def chat_with_bot(user_message: str):
     messages = [
-        {"role": "system", "content": F"You are the support assistant of {TARGET_WEB}. Only answer questions about login, payment, and courses in Persian."},
+        {
+            "role": "system",
+            "content": (
+                f"You are the support assistant of the online store {TARGET_WEB}. "
+                "Only answer questions related to login/signup, payments, orders, products, and customer support. "
+                "Always respond in Persian."
+            ),
+        },
         {"role": "user", "content": user_message},
     ]
+
 
     try:
         response = llm.invoke(messages)
