@@ -1,113 +1,97 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="fa" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>چت با avalai</title>
-    <link href="https://fonts.googleapis.com/css2?family=Vazirmatn&display=swap" rel="stylesheet">
+    <title>چت پشتیبانی</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
     <style>
-        body {
-            font-family: 'Vazirmatn', sans-serif;
-            background-color: #f4f6f8;
-            color: #333;
-            padding: 2em;
-            margin: 0;
-            line-height: 1.6;
-        }
-
-        h1 {
-            color: #2c3e50;
-            margin-bottom: 1em;
-            text-align: center;
-        }
-
-        form {
-            display: flex;
-            flex-direction: column;
-            gap: 1em;
-            max-width: 600px;
-            margin: 0 auto;
-            background-color: #ffffff;
-            padding: 2em;
-            border-radius: 12px;
-            box-shadow: 0 0 10px rgba(0,0,0,0.05);
-        }
-
-        textarea {
-            width: 100%;
-            resize: vertical;
-            min-height: 100px;
-            padding: 1em;
-            font-size: 1em;
-            border: 1px solid #ccc;
-            border-radius: 8px;
-        }
-
-        button {
-            background-color: #3498db;
-            color: white;
-            border: none;
-            padding: 0.75em 1.5em;
-            font-size: 1em;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: background-color 0.3s ease;
-        }
-
-        button:hover {
-            background-color: #2980b9;
-        }
-
-        .response, .usage {
-            max-width: 600px;
-            margin: 2em auto 0;
-            background-color: #ffffff;
-            padding: 1.5em;
-            border-radius: 12px;
-            box-shadow: 0 0 10px rgba(0,0,0,0.05);
-        }
-
-        .response h3, .usage h4 {
-            margin-top: 0;
-        }
-
-        pre {
-            background-color: #f0f0f0;
-            padding: 1em;
-            border-radius: 8px;
-            overflow-x: auto;
-        }
-
-        .error {
-            color: red;
-            text-align: center;
-            margin-top: 1em;
-        }
+        body { font-family: "Vazirmatn", sans-serif; }
+        .typing { border-right: 2px solid #666; white-space: pre-wrap; overflow: hidden; }
     </style>
 </head>
-<body>
+<body class="bg-gradient-to-br from-purple-50 to-indigo-100 flex flex-col h-screen">
 
-    <h1>🤖 چت با Avalai</h1>
+    <!-- Header -->
+    <header class="bg-indigo-600 text-white p-4 shadow-lg flex justify-between items-center">
+        <h1 class="text-xl font-bold">🤖 پشتیبانی آنلاین {{ request.get_host }}</h1>
+    </header>
 
-    <form method="post">
+    <!-- Chat box -->
+    <main id="chat-box" class="flex-1 overflow-y-auto p-4 space-y-4">
+        <!-- پیام‌ها اینجا با htmx اضافه می‌شن -->
+        <div id="bot-typing" class="flex justify-start hidden">
+            <div class="bg-gray-200 text-gray-600 px-4 py-2 rounded-2xl animate-pulse">
+                ربات در حال نوشتن...
+            </div>
+        </div>
+    </main>
+
+    <!-- Input box -->
+    <form method="post"
+          class="p-4 bg-white shadow-lg flex gap-2"
+          hx-post="{% url 'chat' %}"
+          hx-target="#chat-box"
+          hx-swap="beforeend"
+          hx-on::after-request="this.reset()">
         {% csrf_token %}
-        <textarea name="user_input" rows="4" placeholder="پیامت را بنویس...">{{ user_input }}</textarea>
-        <button type="submit">ارسال</button>
+        <input name="user_input" type="text" required
+               placeholder="پیام خود را بنویسید..."
+               class="flex-1 border rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-400">
+        <button type="submit"
+                class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl shadow">
+            ارسال
+        </button>
     </form>
 
-    {% if response %}
-        <div class="response">
-            <h3>🧠 پاسخ:</h3>
-            <p>{{ response }}</p>
-        </div>
-        {% if usage %}
-            <div class="usage">
-                <h4>📊 اطلاعات توکن:</h4>
-                <pre>{{ usage }}</pre>
-            </div>
-        {% endif %}
-    {% elif usage.error %}
-        <div class="error">خطا: {{ usage.error }}</div>
-    {% endif %}
+    <!-- Scripts -->
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            const form = document.querySelector("form");
+            const chatBox = document.getElementById("chat-box");
+            const botTyping = document.getElementById("bot-typing");
 
+            // نمایش فوری پیام کاربر
+            form.addEventListener("submit", (e) => {
+                const input = form.querySelector("input[name='user_input']");
+                const text = input.value.trim();
+                if (!text) return;
+
+                const userHtml = `
+                    <div class="flex justify-end">
+                        <div class="bg-indigo-500 text-white px-4 py-2 rounded-2xl max-w-xs">
+                            ${text}
+                        </div>
+                    </div>`;
+                chatBox.insertAdjacentHTML("beforeend", userHtml);
+                chatBox.scrollTop = chatBox.scrollHeight;
+
+                // نمایش لودینگ ربات
+                botTyping.classList.remove("hidden");
+            });
+
+            // وقتی جواب اومد → لودینگ رو مخفی کن + انیمیشن تایپ کن
+            document.addEventListener("htmx:afterSwap", (e) => {
+                botTyping.classList.add("hidden");
+
+                const botMsg = document.querySelector("#bot-response.typing");
+                if (botMsg) {
+                    const text = botMsg.textContent;
+                    botMsg.textContent = "";
+                    let i = 0;
+                    const interval = setInterval(() => {
+                        botMsg.textContent += text[i];
+                        i++;
+                        chatBox.scrollTop = chatBox.scrollHeight;
+                        if (i >= text.length) {
+                            botMsg.classList.remove("typing");
+                            clearInterval(interval);
+                        }
+                    }, 30);
+                }
+            });
+        });
+    </script>
 </body>
 </html>
